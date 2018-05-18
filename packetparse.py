@@ -21,6 +21,9 @@ def hex_to_int_le(hexstr):
 	except TypeError:
 		return -1
 
+def int_to_hex(intval):
+	return hex(intval)[2:] # remove "0x"
+
 def left_shift_8(byte):
 	return byte << 8
 
@@ -48,7 +51,6 @@ def lfbosns_mV_to_mA(mV):
 	return round(mV * 71.43, 0)
 def led_sns_mV_to_mA(mV):
 	return round(mV / .03, 0)
-
 
 def get_sat_state(val):
 	return {
@@ -195,6 +197,7 @@ def parse_attitude_data(ps):
 		cur['magnetometer2'] = magnetometer2
 
 		cur['timestamp'] = hex_to_int_le(ps[start+58:start+66])
+		cur['data_hash'] = ps[start:start+66]
 
 		data.append(cur)
 		start += 66
@@ -255,6 +258,7 @@ def parse_idle_data(ps):
 		cur['IR_TOP1_AMB'] = ir_raw_to_C(untruncate(int(ps[start+36:start+38], 16), Signals.S_IR_AMB))
 
 		cur['timestamp'] = hex_to_int_le(ps[start+38:start+46])
+		cur['data_hash'] = ps[start:start+46]
 
 		data.append(cur)
 		start += 46
@@ -264,6 +268,7 @@ def parse_flash_burst_data(ps):
 	data = {}
 	burst = [dict() for x in range(FLASHBURST_BATCHES_PER_PACKET)]
 	start = DATA_SECTION_START_BYTE
+	data['data_hash'] = ps[start:start+302]
 	for i in range(0, FLASHBURST_BATCHES_PER_PACKET):
 		burst[i]['LED1TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[start:start+2]), Signals.S_LED_TEMP_FLASH))
 		burst[i]['LED2TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[start+2:start+4]), Signals.S_LED_TEMP_FLASH))
@@ -341,6 +346,7 @@ def parse_flash_cmp_data(ps):
 		magnetometer['z'] = mag_raw_to_uT(untruncate(int(ps[start+40:start+42], 16), Signals.S_MAG))
 
 		cur['timestamp'] = hex_to_int_le(ps[start+42:start+50])
+		cur['data_hash'] = ps[start:start+50]
 		data.append(cur)
 		start += 50
 	return data
@@ -403,6 +409,7 @@ def parse_low_power_data(ps):
 		cur['gyroscope'] = gyroscope
 
 		cur['timestamp'] = hex_to_int_le(ps[start+52:start+60])
+		cur['data_hash'] = ps[start:start+60]
 
 		data.append(cur)
 		start += 60
@@ -432,7 +439,11 @@ def getNumErrorsInPacket(message_type):
 	elif (message_type == 'LOW_POWER'):
 		return 14
 
-def parse_errors(ps, message_type):
+def convert_error_timestamp(timestamp_data, packet_timestamp):
+	# see https://github.com/BrownaSpaceEngineering/EQUiSatOS/blob/master/EQUiSatOS/EQUiSatOS/src/data_handling/package_transmission.c#L209
+	return packet_timestamp - ERROR_TIME_BUCKET_SIZE*timestamp_data
+
+def parse_errors(ps, message_type, packet_timestamp):
 	errors = []
 	start = getErrorStartByte(message_type)
 	num_errors_in_packet = getNumErrorsInPacket(message_type)
@@ -441,9 +452,11 @@ def parse_errors(ps, message_type):
 		cur['error_code'] = int(ps[start:start+2],16) & 0x7F
 		cur['priority_bit'] = get_bit(int(ps[start:start+2],16),7)
 		cur['error_location'] = int(ps[start+2:start+4],16)
-		cur['timestamp'] = int(ps[start+4:start+6],16)
+		cur['timestamp'] = convert_error_timestamp(int(ps[start+4:start+6],16), packet_timestamp)
 		cur['error_code_name'] = get_ECODE_name(cur['error_code'])
 		cur['error_location_name'] = get_ELOC_name(cur['error_location'])
+		# represent packet uniquely as its raw bytes, except use the fully qualified timestamp
+		cur['data_hash'] = ps[start:start+4] + int_to_hex(cur['timestamp'])
 		errors.append(cur)
 		start += 6
 	return errors
@@ -471,7 +484,7 @@ def parse_packet(ps):
 	message_type = packet['preamble']['message_type']
 	packet['data'] = parse_data_section(message_type, ps)
 	num_errors = packet['preamble']['num_errors']
-	packet['errors'] = parse_errors(ps, message_type)
+	packet['errors'] = parse_errors(ps, message_type, packet['preamble']['timestamp'])
 	packet_JSON = json.dumps(packet, indent=4)
 	return packet_JSON
 
