@@ -8,6 +8,9 @@ import sys
 
 from constants import *
 
+class PARSE_ERROR:
+	WRONG_SIZE = "wrong size packet"
+
 def untruncate(val, sig):
 	u16 = (val) << 8;
 	return u16 / get_line_m_from_signal(sig) - get_line_b_from_signal(sig)
@@ -475,9 +478,10 @@ def parse_data_section(message_type, ps):
 
 
 def parse_packet(ps):
-	if (len(ps) != 510):
-		print("Wrong size packet")
-		return
+	# with or without
+	if (len(ps) != 510 and len(ps) != 446):
+		return {}, PARSE_ERROR.WRONG_SIZE
+
 	packet = {}
 	packet['preamble'] = parse_preamble(ps)
 	packet['current_info'] = parse_current_info(ps)
@@ -486,7 +490,7 @@ def parse_packet(ps):
 	num_errors = packet['preamble']['num_errors']
 	packet['errors'] = parse_errors(ps, message_type, packet['preamble']['timestamp'])
 	packet_JSON = json.dumps(packet, indent=4)
-	return packet_JSON
+	return packet_JSON, None
 
 def find_packets(file):
 	with open(file, 'r') as f:
