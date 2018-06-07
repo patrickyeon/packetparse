@@ -91,7 +91,7 @@ def parse_preamble(ps):
 	preamble['message_type'] = get_message_type(msg_op_states & 0x07) #get_bit(msg_op_states, 7)+get_bit(msg_op_states, 6)+get_bit(msg_op_states, 5)
 	preamble['satellite_state'] = get_sat_state((msg_op_states >> 3) & 0x07) #get_bit(msg_op_states, 4)+get_bit(msg_op_states, 3)+get_bit(msg_op_states, 2)
 
-	preamble['SPF_ST'] = get_bit(msg_op_states, 6)
+	preamble['FLASH_KILLED'] = get_bit(msg_op_states, 6)
 	preamble['MRAM_CPY'] = get_bit(msg_op_states, 7)
 
 	try:
