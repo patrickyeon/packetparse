@@ -489,8 +489,7 @@ def parse_packet(ps):
 	packet['data'] = parse_data_section(message_type, ps)
 	num_errors = packet['preamble']['num_errors']
 	packet['errors'] = parse_errors(ps, message_type, packet['preamble']['timestamp'])
-	packet_JSON = json.dumps(packet, indent=4)
-	return packet_JSON, None
+	return packet, None
 
 def find_packets(file):
 	with open(file, 'r') as f:
