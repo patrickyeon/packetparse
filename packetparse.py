@@ -15,10 +15,8 @@ def untruncate(val, sig):
 	u16 = (val) << 8;
 	return u16 / get_line_m_from_signal(sig) - get_line_b_from_signal(sig)
 
-def get_bit(byte, i, invert=False):
-    bit = byte & (1<<i)
-    bit_bool = bit > 0
-    return not bit_bool if invert else bit_bool
+def get_bit(byte, i):
+	return byte & (1<<i) > 0
 
 def hex_to_int_le(hexstr):
 	try:
@@ -123,24 +121,7 @@ def parse_current_info(ps):
 
 	bat_digsigs_1 = int(ps[46:48],16)
 	bat_digsigs_2 = int(ps[48:50],16)
-
-	current_info['L1_RUN_CHG'] = get_bit(bat_digsigs_2, 0)
-	current_info['L2_RUN_CHG'] = get_bit(bat_digsigs_2, 1)
-	current_info['LF_B1_RUN_CHG'] = get_bit(bat_digsigs_2, 2)
-	current_info['LF_B2_RUN_CHG'] = get_bit(bat_digsigs_2, 3)
-	current_info['LF_B2_CHGN'] = get_bit(bat_digsigs_2, 4)
-	current_info['LF_B2_FAULTN'] = get_bit(bat_digsigs_2, 5)
-	current_info['LF_B1_FAULTN'] = get_bit(bat_digsigs_2, 6)
-	current_info['LF_B1_CHGN'] = get_bit(bat_digsigs_2, 7)
-
-	current_info['L2_ST'] = get_bit(bat_digsigs_1, 0)
-	current_info['L1_ST'] = get_bit(bat_digsigs_1, 1)
-	current_info['L1_DISG'] = get_bit(bat_digsigs_1, 2)
-	current_info['L2_DISG'] = get_bit(bat_digsigs_1, 3)
-	current_info['L1_CHGN'] = get_bit(bat_digsigs_1, 4)
-	current_info['L1_FAULTN'] = get_bit(bat_digsigs_1, 5)
-	current_info['L2_CHGN'] = get_bit(bat_digsigs_1, 6)
-	current_info['L2_FAULTN'] = get_bit(bat_digsigs_1, 7)
+	parse_dig_sigs(bat_digsigs_1, bat_digsigs_2, current_info)
 
 	current_info['LF1REF'] = untruncate(int(ps[50:52], 16), Signals.S_LF_VOLT)
 	current_info['LF2REF'] = untruncate(int(ps[52:54], 16), Signals.S_LF_VOLT)
@@ -214,13 +195,7 @@ def parse_idle_data(ps):
 	for i in range(0, IDLE_BATCHES_PER_PACKET):
 		cur = {}
 		event_history = int(ps[start:start+2],16)
-		cur['ANTENNA_DEPLOYED'] = get_bit(event_history, 1)
-		cur['LION_1_CHARGED'] = get_bit(event_history, 2)
-		cur['LION_2_CHARGED'] = get_bit(event_history, 3)
-		cur['LIFEPO4_B1_CHARGED'] = get_bit(event_history, 4)
-		cur['LIFEPO4_B2_CHARGED'] = get_bit(event_history, 5)
-		cur['FIRST_FLASH'] = get_bit(event_history, 6)
-		cur['PROG_MEM_REWRITTEN'] = get_bit(event_history, 7)
+		parse_event_history(event_history, cur)
 
 		cur['L1_REF'] = untruncate(int(ps[start+2:start+4], 16), Signals.S_LREF)
 		cur['L2_REF'] = untruncate(int(ps[start+4:start+6], 16), Signals.S_LREF)
@@ -233,24 +208,7 @@ def parse_idle_data(ps):
 
 		bat_digsigs_1 = int(ps[start+18:start+20],16)
 		bat_digsigs_2 = int(ps[start+20:start+22],16)
-
-		cur['L1_RUN_CHG'] = get_bit(bat_digsigs_1, 7)
-		cur['L2_RUN_CHG'] = get_bit(bat_digsigs_1, 6)
-		cur['LF_B1_RUN_CHG'] = get_bit(bat_digsigs_1, 5)
-		cur['LF_B2_RUN_CHG'] = get_bit(bat_digsigs_1, 4)
-		cur['LF_B2_CHGN'] = get_bit(bat_digsigs_1, 3)
-		cur['LF_B2_FAULTN'] = get_bit(bat_digsigs_1, 2)
-		cur['LF_B1_FAULTN'] = get_bit(bat_digsigs_1, 1)
-		cur['LF_B0_FAULTN'] = get_bit(bat_digsigs_1, 0)
-
-		cur['L2_ST'] = get_bit(bat_digsigs_2, 7)
-		cur['L1_ST'] = get_bit(bat_digsigs_2, 6)
-		cur['L1_DISG'] = get_bit(bat_digsigs_2, 5)
-		cur['L2_DISG'] = get_bit(bat_digsigs_2, 4)
-		cur['L1_CHGN'] = get_bit(bat_digsigs_2, 3)
-		cur['L1_FAULTN'] = get_bit(bat_digsigs_2, 3)
-		cur['L2_CHGN'] = get_bit(bat_digsigs_2, 2)
-		cur['L2_FAULTN'] = get_bit(bat_digsigs_2, 1)
+		parse_dig_sigs(bat_digsigs_1, bat_digsigs_2, cur)
 
 		cur['RAD_TEMP'] = untruncate(int(ps[start+22:start+24], 16), Signals.S_RAD_TEMP)/10
 		cur['IMU_TEMP'] = untruncate(int(ps[start+24:start+26], 16), Signals.S_IMU_TEMP)
@@ -362,13 +320,7 @@ def parse_low_power_data(ps):
 	for i in range(0, LOWPOWER_BATCHES_PER_PACKET):
 		cur = {}
 		event_history = int(ps[start:start+2],16)
-		cur['ANTENNA_DEPLOYED'] = get_bit(event_history, 1)
-		cur['LION_1_CHARGED'] = get_bit(event_history, 2)
-		cur['LION_2_CHARGED'] = get_bit(event_history, 3)
-		cur['LIFEPO4_B1_CHARGED'] = get_bit(event_history, 4)
-		cur['LIFEPO4_B2_CHARGED'] = get_bit(event_history, 5)
-		cur['FIRST_FLASH'] = get_bit(event_history, 6)
-		cur['PROG_MEM_REWRITTEN'] = get_bit(event_history, 7)
+		parse_event_history(event_history, cur)
 
 		cur['L1_REF'] = untruncate(int(ps[start+2:start+4], 16), Signals.S_LREF)
 		cur['L2_REF'] = untruncate(int(ps[start+4:start+6], 16), Signals.S_LREF)
@@ -381,24 +333,7 @@ def parse_low_power_data(ps):
 
 		bat_digsigs_1 = int(ps[start+18:start+20],16)
 		bat_digsigs_2 = int(ps[start+20:start+22],16)
-
-		cur['L1_RUN_CHG'] = get_bit(bat_digsigs_1, 7)
-		cur['L2_RUN_CHG'] = get_bit(bat_digsigs_1, 6)
-		cur['LF_B1_RUN_CHG'] = get_bit(bat_digsigs_1, 5)
-		cur['LF_B2_RUN_CHG'] = get_bit(bat_digsigs_1, 4)
-		cur['LF_B2_CHGN'] = get_bit(bat_digsigs_1, 3)
-		cur['LF_B2_FAULTN'] = get_bit(bat_digsigs_1, 2)
-		cur['LF_B1_FAULTN'] = get_bit(bat_digsigs_1, 1)
-		cur['LF_B0_FAULTN'] = get_bit(bat_digsigs_1, 0)
-
-		cur['L2_ST'] = get_bit(bat_digsigs_2, 7)
-		cur['L1_ST'] = get_bit(bat_digsigs_2, 6)
-		cur['L1_DISG'] = get_bit(bat_digsigs_2, 5)
-		cur['L2_DISG'] = get_bit(bat_digsigs_2, 4)
-		cur['L1_CHGN'] = get_bit(bat_digsigs_2, 3)
-		cur['L1_FAULTN'] = get_bit(bat_digsigs_2, 3)
-		cur['L2_CHGN'] = get_bit(bat_digsigs_2, 2)
-		cur['L2_FAULTN'] = get_bit(bat_digsigs_2, 1)
+		parse_dig_sigs(bat_digsigs_1, bat_digsigs_2, cur)
 
 		cur['IR_FLASH_OBJ'] = ir_raw_to_C(hex_to_int_le(ps[start+22:start+26]+'0000'))
 		cur['IR_SIDE1_OBJ'] = ir_raw_to_C(hex_to_int_le(ps[start+26:start+30]+'0000'))
@@ -419,6 +354,37 @@ def parse_low_power_data(ps):
 		data.append(cur)
 		start += 60
 	return data
+
+# common parsers
+def parse_event_history(event_history, obj):
+	obj['ANTENNA_DEPLOYED'] = get_bit(event_history, 1)
+	obj['LION_1_CHARGED'] = get_bit(event_history, 2)
+	obj['LION_2_CHARGED'] = get_bit(event_history, 3)
+	obj['LIFEPO4_B1_CHARGED'] = get_bit(event_history, 4)
+	obj['LIFEPO4_B2_CHARGED'] = get_bit(event_history, 5)
+	obj['FIRST_FLASH'] = get_bit(event_history, 6)
+	obj['PROG_MEM_REWRITTEN'] = get_bit(event_history, 7)
+
+
+def parse_dig_sigs(bat_digsigs_1, bat_digsigs_2, obj):
+	# invert some signals that are active LOW
+	obj['L1_RUN_CHG'] = get_bit(bat_digsigs_1, 0)
+	obj['L2_RUN_CHG'] = get_bit(bat_digsigs_1, 1)
+	obj['LF_B1_RUN_CHG'] = get_bit(bat_digsigs_1, 2)
+	obj['LF_B2_RUN_CHG'] = get_bit(bat_digsigs_1, 3)
+	obj['LF_B2_CHGN'] = not get_bit(bat_digsigs_1, 4)
+	obj['LF_B2_FAULTN'] = not get_bit(bat_digsigs_1, 5)
+	obj['LF_B1_FAULTN'] = not get_bit(bat_digsigs_1, 6)
+	obj['LF_B1_CHGN'] = not get_bit(bat_digsigs_1, 7)
+
+	obj['L2_ST'] = get_bit(bat_digsigs_2, 0)
+	obj['L1_ST'] = get_bit(bat_digsigs_2, 1)
+	obj['L1_DISG'] = not get_bit(bat_digsigs_2, 2)
+	obj['L2_DISG'] = not get_bit(bat_digsigs_2, 3)
+	obj['L1_CHGN'] = not get_bit(bat_digsigs_2, 4)
+	obj['L1_FAULTN'] = not get_bit(bat_digsigs_2, 5)
+	obj['L2_CHGN'] = not get_bit(bat_digsigs_2, 6)
+	obj['L2_FAULTN'] = not get_bit(bat_digsigs_2, 7)
 
 def getErrorStartByte(message_type):
 	if (message_type == 'IDLE'):
@@ -512,9 +478,8 @@ def main():
 	lp2 = "574c39585a45f60b00002c960eff01b7c5585904040057e8ffe7e747471eb8c5585904040057e8f6a839a839a439ac39b739a4397f7f80f50b00001ec1c5585804040058e8f6a839a839a339a939ba39a4397f7f80e10b00001eb8c5585904040057e8f6a839a839a439ac39b739a4397f7f80f50b00001ec1c5585804040058e8f6a839a839a339a939ba39a4397f7f80e10b00001ecbc5585804040057e8f6a439a439a339a839ba39a0397f7f80cd0b00009b30079b31079c3107254607a73307a72907364e08b44c08ab34083b4b080815089b1aff9b2bff9b2aff00000000000000000000000000000000000000000000000000000000000000000000"
 	test = "574c39585a45671600002c9618ff04e1e25d5803032856f0e2c6b2a0b20ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600009c30009b2a009b2f009c2e009b2a009c30009b2f009c2e00573b00323d00323d06573b07b54a090e050000003f73fed7e2e664ec3eea86bc64849d141afd525558ca00a32d87879a23043592"
 
-
 	if (len(sys.argv) < 2):
-		print(parse_packet(fb2))
+		print(json.dumps(parse_packet(fc1), indent=4))
 	else:
 		for x in sys.argv[1:]:
 			packets = find_packets(x)
@@ -522,4 +487,4 @@ def main():
 				print(parse_packet(packet))
 
 if __name__ == "__main__":
-    main()
+	main()
