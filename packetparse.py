@@ -17,7 +17,8 @@ def untruncate(val, sig):
 
 def get_bit(byte, i, invert=False):
     bit = byte & (1<<i)
-    return not bit if invert else bit
+    bit_bool = bit > 0
+    return not bit_bool if invert else bit_bool
 
 def hex_to_int_le(hexstr):
 	try:
