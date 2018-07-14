@@ -15,8 +15,9 @@ def untruncate(val, sig):
 	u16 = (val) << 8;
 	return u16 / get_line_m_from_signal(sig) - get_line_b_from_signal(sig)
 
-def get_bit(byte,i):
-    return (byte & (1<<i)) != 0 # boolean
+def get_bit(byte, i, invert=False):
+    bit = byte & (1<<i)
+    return not bit if invert else bit
 
 def hex_to_int_le(hexstr):
 	try:
@@ -126,19 +127,19 @@ def parse_current_info(ps):
 	current_info['L2_RUN_CHG'] = get_bit(bat_digsigs_2, 1)
 	current_info['LF_B1_RUN_CHG'] = get_bit(bat_digsigs_2, 2)
 	current_info['LF_B2_RUN_CHG'] = get_bit(bat_digsigs_2, 3)
-	current_info['LF_B2_CHGN'] = get_bit(bat_digsigs_2, 4)
-	current_info['LF_B2_FAULTN'] = get_bit(bat_digsigs_2, 5)
-	current_info['LF_B1_FAULTN'] = get_bit(bat_digsigs_2, 6)
-	current_info['LF_B1_CHGN'] = get_bit(bat_digsigs_2, 7)
+	current_info['LF_B2_CHGN'] = get_bit(bat_digsigs_2, 4, invert=True)
+	current_info['LF_B2_FAULTN'] = get_bit(bat_digsigs_2, 5, invert=True)
+	current_info['LF_B1_FAULTN'] = get_bit(bat_digsigs_2, 6, invert=True)
+	current_info['LF_B1_CHGN'] = get_bit(bat_digsigs_2, 7, invert=True)
 
 	current_info['L2_ST'] = get_bit(bat_digsigs_1, 0)
 	current_info['L1_ST'] = get_bit(bat_digsigs_1, 1)
-	current_info['L1_DISG'] = get_bit(bat_digsigs_1, 2)
-	current_info['L2_DISG'] = get_bit(bat_digsigs_1, 3)
-	current_info['L1_CHGN'] = get_bit(bat_digsigs_1, 4)
-	current_info['L1_FAULTN'] = get_bit(bat_digsigs_1, 5)
-	current_info['L2_CHGN'] = get_bit(bat_digsigs_1, 6)
-	current_info['L2_FAULTN'] = get_bit(bat_digsigs_1, 7)
+	current_info['L1_DISG'] = get_bit(bat_digsigs_1, 2, invert=True)
+	current_info['L2_DISG'] = get_bit(bat_digsigs_1, 3, invert=True)
+	current_info['L1_CHGN'] = get_bit(bat_digsigs_1, 4, invert=True)
+	current_info['L1_FAULTN'] = get_bit(bat_digsigs_1, 5, invert=True)
+	current_info['L2_CHGN'] = get_bit(bat_digsigs_1, 6, invert=True)
+	current_info['L2_FAULTN'] = get_bit(bat_digsigs_1, 7, invert=True)
 
 	current_info['LF1REF'] = untruncate(int(ps[50:52], 16), Signals.S_LF_VOLT)
 	current_info['LF2REF'] = untruncate(int(ps[52:54], 16), Signals.S_LF_VOLT)
