@@ -214,13 +214,13 @@ def parse_idle_data(ps):
 	for i in range(0, IDLE_BATCHES_PER_PACKET):
 		cur = {}
 		event_history = int(ps[start:start+2],16)
-		cur['ANTENNA_DEPLOYED'] = get_bit(event_history, 7)
-		cur['LION_1_CHARGED'] = get_bit(event_history, 6)
-		cur['LION_2_CHARGED'] = get_bit(event_history, 5)
+		cur['ANTENNA_DEPLOYED'] = get_bit(event_history, 1)
+		cur['LION_1_CHARGED'] = get_bit(event_history, 2)
+		cur['LION_2_CHARGED'] = get_bit(event_history, 3)
 		cur['LIFEPO4_B1_CHARGED'] = get_bit(event_history, 4)
-		cur['LIFEPO4_B2_CHARGED'] = get_bit(event_history, 3)
-		cur['FIRST_FLASH'] = get_bit(event_history, 2)
-		cur['PROG_MEM_REWRITTEN'] = get_bit(event_history, 1)
+		cur['LIFEPO4_B2_CHARGED'] = get_bit(event_history, 5)
+		cur['FIRST_FLASH'] = get_bit(event_history, 6)
+		cur['PROG_MEM_REWRITTEN'] = get_bit(event_history, 7)
 
 		cur['L1_REF'] = untruncate(int(ps[start+2:start+4], 16), Signals.S_LREF)
 		cur['L2_REF'] = untruncate(int(ps[start+4:start+6], 16), Signals.S_LREF)
