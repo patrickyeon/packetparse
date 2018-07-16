@@ -33,8 +33,8 @@ def left_shift_8(byte):
 def hex_string_byte_to_signed_int(byte):
 	return int(byte + '000000', 16) >> 24
 
-def mag_raw_to_uT(raw):
-	return round(raw*0.6,2)
+def mag_raw_to_mG(raw):	
+	return round((raw/1090.)*1000.,2)
 def acc_raw_to_g(raw):
 	return round(raw/16384.,2)
 def gyro_raw_to_dps(raw):
@@ -164,13 +164,13 @@ def parse_attitude_data(ps):
 		cur['gyroscopeZ'] = gyro_raw_to_dps(untruncate(int(ps[start+42:start+44], 16), Signals.S_GYRO))*-1
 		cur['gyroscopeY'] = gyro_raw_to_dps(untruncate(int(ps[start+44:start+46], 16), Signals.S_GYRO))		
 		
-		cur['magnetometer1X'] = mag_raw_to_uT(untruncate(int(ps[start+46:start+48], 16), Signals.S_MAG))*-1
-		cur['magnetometer1Z'] = mag_raw_to_uT(untruncate(int(ps[start+48:start+50], 16), Signals.S_MAG))*-1
-		cur['magnetometer1Y'] = mag_raw_to_uT(untruncate(int(ps[start+50:start+52], 16), Signals.S_MAG))		
+		cur['magnetometer1Z'] = mag_raw_to_mG(untruncate(int(ps[start+46:start+48], 16), Signals.S_MAG))
+		cur['magnetometer1X'] = mag_raw_to_mG(untruncate(int(ps[start+48:start+50], 16), Signals.S_MAG))*-1
+		cur['magnetometer1Y'] = mag_raw_to_mG(untruncate(int(ps[start+50:start+52], 16), Signals.S_MAG))*-1
 		
-		cur['magnetometer2X'] = mag_raw_to_uT(untruncate(int(ps[start+52:start+54], 16), Signals.S_MAG))*-1
-		cur['magnetometer2Z'] = mag_raw_to_uT(untruncate(int(ps[start+54:start+56], 16), Signals.S_MAG))*-1
-		cur['magnetometer2Y'] = mag_raw_to_uT(untruncate(int(ps[start+56:start+58], 16), Signals.S_MAG))		
+		cur['magnetometer2Z'] = mag_raw_to_mG(untruncate(int(ps[start+52:start+54], 16), Signals.S_MAG))
+		cur['magnetometer2X'] = mag_raw_to_mG(untruncate(int(ps[start+54:start+56], 16), Signals.S_MAG))*-1
+		cur['magnetometer2Y'] = mag_raw_to_mG(untruncate(int(ps[start+56:start+58], 16), Signals.S_MAG))*-1		
 
 		cur['timestamp'] = hex_to_int_le(ps[start+58:start+66])
 		cur['data_hash'] = ps[start:start+66]
@@ -255,12 +255,10 @@ def parse_flash_burst_data(ps):
 		burst[i]['LED4SNS'] = led_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[start+6:start+8]), Signals.S_LED_SNS))
 		start += 8
 
-	for i in range(0, FLASHBURST_BATCHES_PER_PACKET):
-		gyroscope = {}
-		gyroscope['x'] = gyro_raw_to_dps(untruncate(int(ps[start:start+2], 16), Signals.S_GYRO))
-		gyroscope['y'] = gyro_raw_to_dps(untruncate(int(ps[start+2:start+4], 16), Signals.S_GYRO))
-		gyroscope['z'] = gyro_raw_to_dps(untruncate(int(ps[start+4:start+6], 16), Signals.S_GYRO))
-		burst[i]['gyroscope'] = gyroscope
+	for i in range(0, FLASHBURST_BATCHES_PER_PACKET):		
+		burst[i]['gyroscopeX'] = gyro_raw_to_dps(untruncate(int(ps[start:start+2], 16), Signals.S_GYRO))*-1
+		burst[i]['gyroscopeZ'] = gyro_raw_to_dps(untruncate(int(ps[start+2:start+4], 16), Signals.S_GYRO))*-1
+		burst[i]['gyroscopeY'] = gyro_raw_to_dps(untruncate(int(ps[start+4:start+6], 16), Signals.S_GYRO))		
 		start += 6
 	data['burst'] = burst
 	data['timestamp'] = hex_to_int_le(ps[start:start+8])
@@ -292,11 +290,10 @@ def parse_flash_cmp_data(ps):
 		cur['LED2SNS'] = led_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[start+30:start+32]), Signals.S_LED_SNS))
 		cur['LED3SNS'] = led_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[start+32:start+34]), Signals.S_LED_SNS))
 		cur['LED4SNS'] = led_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[start+34:start+36]), Signals.S_LED_SNS))
-
-		magnetometer = {}
-		magnetometer['x'] = mag_raw_to_uT(untruncate(int(ps[start+36:start+38], 16), Signals.S_MAG))
-		magnetometer['y'] = mag_raw_to_uT(untruncate(int(ps[start+38:start+40], 16), Signals.S_MAG))
-		magnetometer['z'] = mag_raw_to_uT(untruncate(int(ps[start+40:start+42], 16), Signals.S_MAG))
+		
+		cur['magnetometer1Z'] = mag_raw_to_mG(untruncate(int(ps[start+36:start+38], 16), Signals.S_MAG))
+		cur['magnetometer1X'] = mag_raw_to_mG(untruncate(int(ps[start+38:start+40], 16), Signals.S_MAG))*-1
+		cur['magnetometer1Y'] = mag_raw_to_mG(untruncate(int(ps[start+40:start+42], 16), Signals.S_MAG))*-1
 
 		cur['timestamp'] = hex_to_int_le(ps[start+42:start+50])
 		cur['data_hash'] = ps[start:start+50]
@@ -331,12 +328,10 @@ def parse_low_power_data(ps):
 		cur['IR_RBF_OBJ'] = ir_raw_to_C(hex_to_int_le(ps[start+34:start+38]+'0000'))
 		cur['IR_ACCESS_OBJ'] = ir_raw_to_C(hex_to_int_le(ps[start+38:start+42]+'0000'))
 		cur['IR_TOP1_OBJ'] = ir_raw_to_C(hex_to_int_le(ps[start+42:start+46]+'0000'))
-
-		gyroscope = {}
-		gyroscope['x'] = gyro_raw_to_dps(untruncate(int(ps[start+46:start+48], 16), Signals.S_GYRO))
-		gyroscope['y'] = gyro_raw_to_dps(untruncate(int(ps[start+48:start+50], 16), Signals.S_GYRO))
-		gyroscope['z'] = gyro_raw_to_dps(untruncate(int(ps[start+50:start+52], 16), Signals.S_GYRO))
-		cur['gyroscope'] = gyroscope
+		
+		cur['gyroscopeX'] = gyro_raw_to_dps(untruncate(int(ps[start+46:start+48], 16), Signals.S_GYRO))*-1
+		cur['gyroscopeZ'] = gyro_raw_to_dps(untruncate(int(ps[start+48:start+50], 16), Signals.S_GYRO))*-1
+		cur['gyroscopeY'] = gyro_raw_to_dps(untruncate(int(ps[start+50:start+52], 16), Signals.S_GYRO))		
 
 		cur['timestamp'] = hex_to_int_le(ps[start+52:start+60])
 		cur['data_hash'] = ps[start:start+60]
@@ -381,11 +376,11 @@ def getErrorStartByte(message_type):
 		return 190*2
 	elif (message_type == 'ATTITUDE'):
 		return 194*2
-	elif (message_type == 'FLASH_BURST'):
+	elif (message_type == 'FLASH BURST'):
 		return 180*2
-	elif (message_type == 'FLASH_CMP'):
+	elif (message_type == 'FLASH CMP'):
 		return 179*2
-	elif (message_type == 'LOW_POWER'):
+	elif (message_type == 'LOW POWER'):
 		return 179*2
 
 def getNumErrorsInPacket(message_type):
@@ -393,11 +388,11 @@ def getNumErrorsInPacket(message_type):
 		return 11
 	elif (message_type == 'ATTITUDE'):
 		return 9
-	elif (message_type == 'FLASH_BURST'):
+	elif (message_type == 'FLASH BURST'):
 		return 14
-	elif (message_type == 'FLASH_CMP'):
+	elif (message_type == 'FLASH CMP'):
 		return 14
-	elif (message_type == 'LOW_POWER'):
+	elif (message_type == 'LOW POWER'):
 		return 14
 
 def convert_error_timestamp(timestamp_data, packet_timestamp):
@@ -427,11 +422,11 @@ def parse_data_section(message_type, ps):
 		return parse_idle_data(ps)
 	elif (message_type == 'ATTITUDE'):
 		return parse_attitude_data(ps)
-	elif (message_type == 'FLASH_BURST'):
+	elif (message_type == 'FLASH BURST'):
 		return parse_flash_burst_data(ps)
-	elif (message_type == 'FLASH_CMP'):
+	elif (message_type == 'FLASH CMP'):
 		return parse_flash_cmp_data(ps)
-	elif (message_type == 'LOW_POWER'):
+	elif (message_type == 'LOW POWER'):
 		return parse_low_power_data(ps)
 
 
@@ -469,7 +464,7 @@ def main():
 	test = "574c39585a45671600002c9618ff04e1e25d5803032856f0e2c6b2a0b20ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600009c30009b2a009b2f009c2e009b2a009c30009b2f009c2e00573b00323d00323d06573b07b54a090e050000003f73fed7e2e664ec3eea86bc64849d141afd525558ca00a32d87879a23043592"
 	
 	if (len(sys.argv) < 2):
-		print(json.dumps(parse_packet(attitude), indent=4))
+		print(json.dumps(parse_packet(fc1), indent=4))
 	else:
 		for x in sys.argv[1:]:
 			packets = find_packets(x)
