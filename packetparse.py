@@ -58,20 +58,20 @@ def led_sns_mV_to_mA(mV):
 def get_sat_state(val):
 	return {
 		0:	'INITIAL',
-		1:	'ANTENNA_DEPLOY',
-		2:	'HELLO_WORLD',
-		3:	'IDLE_NO_FLASH',
-		4:	'IDLE_FLASH',
-		5:	'LOW_POWER'
+		1:	'ANTENNA DEPLOY',
+		2:	'HELLO WORLD',
+		3:	'IDLE NO FLASH',
+		4:	'IDLE FLASH',
+		5:	'LOW POWER'
 	}[val]
 
 def get_message_type(val):
 	return {
 		0:	'IDLE',
 		1:	'ATTITUDE',
-		2:	'FLASH_BURST',
-		3:	'FLASH_CMP',
-		4:	'LOW_POWER'
+		2:	'FLASH BURST',
+		3:	'FLASH CMP',
+		4:	'LOW POWER'
 	}[val]
 
 def is_hex_str(ps):
