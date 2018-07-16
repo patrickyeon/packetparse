@@ -151,36 +151,26 @@ def parse_attitude_data(ps):
 		cur['PD_ACCESS'] = (pd_1 >> 0) & (0x03)
 		cur['PD_TOP1'] = (pd_2 >> 6) & (0x03)
 		cur['PD_TOP2'] = (pd_2 >> 4) & (0x03)
-
-		accelerometer1 = {}
-		accelerometer1['x'] = acc_raw_to_g(untruncate(int(ps[start+28:start+30], 16), Signals.S_ACCEL))
-		accelerometer1['y'] = acc_raw_to_g(untruncate(int(ps[start+30:start+32], 16), Signals.S_ACCEL))
-		accelerometer1['z'] = acc_raw_to_g(untruncate(int(ps[start+32:start+34], 16), Signals.S_ACCEL))
-		cur['accelerometer1'] = accelerometer1
-
-		accelerometer2 = {}
-		accelerometer2['x'] = acc_raw_to_g(untruncate(int(ps[start+34:start+36], 16), Signals.S_ACCEL))
-		accelerometer2['y'] = acc_raw_to_g(untruncate(int(ps[start+36:start+38], 16), Signals.S_ACCEL))
-		accelerometer2['z'] = acc_raw_to_g(untruncate(int(ps[start+38:start+40], 16), Signals.S_ACCEL))
-		cur['accelerometer2'] = accelerometer2
-
-		gyroscope = {}
-		gyroscope['x'] = gyro_raw_to_dps(untruncate(int(ps[start+40:start+42], 16), Signals.S_GYRO))
-		gyroscope['y'] = gyro_raw_to_dps(untruncate(int(ps[start+42:start+44], 16), Signals.S_GYRO))
-		gyroscope['z'] = gyro_raw_to_dps(untruncate(int(ps[start+44:start+46], 16), Signals.S_GYRO))
-		cur['gyroscope'] = gyroscope
-
-		magnetometer1 = {}
-		magnetometer1['x'] = mag_raw_to_uT(untruncate(int(ps[start+46:start+48], 16), Signals.S_MAG))
-		magnetometer1['y'] = mag_raw_to_uT(untruncate(int(ps[start+48:start+50], 16), Signals.S_MAG))
-		magnetometer1['z'] = mag_raw_to_uT(untruncate(int(ps[start+50:start+52], 16), Signals.S_MAG))
-		cur['magnetometer1'] = magnetometer1
-
-		magnetometer2 = {}
-		magnetometer2['x'] = mag_raw_to_uT(untruncate(int(ps[start+52:start+54], 16), Signals.S_MAG))
-		magnetometer2['y'] = mag_raw_to_uT(untruncate(int(ps[start+54:start+56], 16), Signals.S_MAG))
-		magnetometer2['z'] = mag_raw_to_uT(untruncate(int(ps[start+56:start+58], 16), Signals.S_MAG))
-		cur['magnetometer2'] = magnetometer2
+		
+		cur['accelerometer1X'] = acc_raw_to_g(untruncate(int(ps[start+28:start+30], 16), Signals.S_ACCEL))*-1
+		cur['accelerometer1Z'] = acc_raw_to_g(untruncate(int(ps[start+30:start+32], 16), Signals.S_ACCEL))*-1
+		cur['accelerometer1Y'] = acc_raw_to_g(untruncate(int(ps[start+32:start+34], 16), Signals.S_ACCEL))		
+		
+		cur['accelerometer2X'] = acc_raw_to_g(untruncate(int(ps[start+34:start+36], 16), Signals.S_ACCEL))*-1
+		cur['accelerometer2Z'] = acc_raw_to_g(untruncate(int(ps[start+36:start+38], 16), Signals.S_ACCEL))*-1
+		cur['accelerometer2Y'] = acc_raw_to_g(untruncate(int(ps[start+38:start+40], 16), Signals.S_ACCEL))		
+		
+		cur['gyroscopeX'] = gyro_raw_to_dps(untruncate(int(ps[start+40:start+42], 16), Signals.S_GYRO))*-1
+		cur['gyroscopeZ'] = gyro_raw_to_dps(untruncate(int(ps[start+42:start+44], 16), Signals.S_GYRO))*-1
+		cur['gyroscopeY'] = gyro_raw_to_dps(untruncate(int(ps[start+44:start+46], 16), Signals.S_GYRO))		
+		
+		cur['magnetometer1X'] = mag_raw_to_uT(untruncate(int(ps[start+46:start+48], 16), Signals.S_MAG))*-1
+		cur['magnetometer1Z'] = mag_raw_to_uT(untruncate(int(ps[start+48:start+50], 16), Signals.S_MAG))*-1
+		cur['magnetometer1Y'] = mag_raw_to_uT(untruncate(int(ps[start+50:start+52], 16), Signals.S_MAG))		
+		
+		cur['magnetometer2X'] = mag_raw_to_uT(untruncate(int(ps[start+52:start+54], 16), Signals.S_MAG))*-1
+		cur['magnetometer2Z'] = mag_raw_to_uT(untruncate(int(ps[start+54:start+56], 16), Signals.S_MAG))*-1
+		cur['magnetometer2Y'] = mag_raw_to_uT(untruncate(int(ps[start+56:start+58], 16), Signals.S_MAG))		
 
 		cur['timestamp'] = hex_to_int_le(ps[start+58:start+66])
 		cur['data_hash'] = ps[start:start+66]
@@ -479,7 +469,7 @@ def main():
 	test = "574c39585a45671600002c9618ff04e1e25d5803032856f0e2c6b2a0b20ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600009c30009b2a009b2f009c2e009b2a009c30009b2f009c2e00573b00323d00323d06573b07b54a090e050000003f73fed7e2e664ec3eea86bc64849d141afd525558ca00a32d87879a23043592"
 	
 	if (len(sys.argv) < 2):
-		print(json.dumps(parse_packet(fc1), indent=4))
+		print(json.dumps(parse_packet(attitude), indent=4))
 	else:
 		for x in sys.argv[1:]:
 			packets = find_packets(x)
