@@ -6,13 +6,8 @@ import json
 import re
 import sys
 
-# sorry...
-constants = {}
-with open('constants.json') as json_data:
-    constants = json.load(json_data)
-mappings = {}
-with open('mappings.json') as json_data:
-    mappings = json.load(json_data)
+from constants import constants
+from mappings import mappings
 
 class PARSE_ERROR:
 	WRONG_SIZE = "wrong size packet"
