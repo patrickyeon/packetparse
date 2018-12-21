@@ -7,7 +7,6 @@ import re
 import sys
 
 from constants import constants
-from mappings import mappings
 
 class PARSE_ERROR:
 	WRONG_SIZE = "wrong size packet"
@@ -24,22 +23,22 @@ Ms_and_Bs = constants["Ms_and_Bs"]
 
 def get_line_m_from_signal(sig):
 	try:
-		return Ms_and_Bs[mappings["line_m_from_signal"][sig]]
+		return Ms_and_Bs[constants["line_m_from_signal"][sig]]
 	except KeyError:
 		return -1
 def get_line_b_from_signal(sig):
 	try:
-		return Ms_and_Bs[mappings["line_b_from_signal"][sig]]
+		return Ms_and_Bs[constants["line_b_from_signal"][sig]]
 	except KeyError:
 		return -1
 def get_ELOC_name(eloc):
 	try:
-		return mappings["ELOC_name"][eloc]
+		return constants["ELOC_name"][eloc]
 	except KeyError:
 		return "[invalid]"
 def get_ECODE_name(ecode):
 	try:
-		return mappings["ECODE_name"][ecode]
+		return constants["ECODE_name"][ecode]
 	except KeyError:
 		return "[invalid]"
 

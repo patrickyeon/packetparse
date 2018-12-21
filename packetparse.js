@@ -1,5 +1,4 @@
 var constants = require("./constants.json");
-var mappings = require("./mappings.json");
 
 // constant helpers
 DATA_SECTION_START_BYTE = constants["DATA_SECTION_START_BYTE"]
@@ -12,7 +11,7 @@ ERROR_TIME_BUCKET_SIZE = constants["ERROR_TIME_BUCKET_SIZE"]
 Ms_and_Bs = constants["Ms_and_Bs"]
 
 function get_line_m_from_signal(sig) {
-	val = Ms_and_Bs[mappings["line_m_from_signal"][sig]]
+	val = Ms_and_Bs[constants["line_m_from_signal"][sig]]
 	if (val === undefined) {
 		return -1
 	} else {
@@ -20,7 +19,7 @@ function get_line_m_from_signal(sig) {
 	}
 }
 function get_line_b_from_signal(sig) {
-	val = Ms_and_Bs[mappings["line_b_from_signal"][sig]]
+	val = Ms_and_Bs[constants["line_b_from_signal"][sig]]
 	if (val === undefined) {
 		return -1
 	} else {
@@ -28,7 +27,7 @@ function get_line_b_from_signal(sig) {
 	}
 }
 function get_ELOC_name(eloc) {
-	val = mappings["ELOC_name"][eloc]
+	val = constants["ELOC_name"][eloc]
 	if (val === undefined) {
 		return "[invalid]"
 	} else {
@@ -36,7 +35,7 @@ function get_ELOC_name(eloc) {
 	}
 }
 function get_ECODE_name(ecode) {
-	val = mappings["ECODE_name"][ecode]
+	val = constants["ECODE_name"][ecode]
 	if (val === undefined) {
 		return "[invalid]"
 	} else {
