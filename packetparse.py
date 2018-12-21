@@ -5,11 +5,19 @@ from binascii import unhexlify
 import json
 import re
 import sys
+import random
+import binascii
 
 from constants import constants
 
 class PARSE_ERROR:
 	WRONG_SIZE = "wrong size packet"
+	INVALID_MSG_TYPE = "invalid message type"
+	INVALID_SAT_STATE = "invalid sat state"
+	INVALID_ECODE = "invalid error code(s)"
+	INVALID_ELOC = "invalid error location(s)"
+
+INVALID_STR = "[invalid]"
 
 # constant helpers
 DATA_SECTION_START_BYTE = constants["DATA_SECTION_START_BYTE"]
@@ -34,13 +42,13 @@ def get_line_b_from_signal(sig):
 def get_ELOC_name(eloc):
 	try:
 		return constants["ELOC_name"][eloc]
-	except KeyError:
-		return "[invalid]"
+	except IndexError:
+		return INVALID_STR
 def get_ECODE_name(ecode):
 	try:
 		return constants["ECODE_name"][ecode]
-	except KeyError:
-		return "[invalid]"
+	except IndexError:
+		return INVALID_STR
 
 def untruncate(val, sig):
 	u16 = (val) << 8;
@@ -87,23 +95,29 @@ def led_sns_mV_to_mA(mV):
 	return round(mV / .03, 0)
 
 def get_sat_state(val):
-	return {
-		0:	'INITIAL',
-		1:	'ANTENNA DEPLOY',
-		2:	'HELLO WORLD',
-		3:	'IDLE NO FLASH',
-		4:	'IDLE FLASH',
-		5:	'LOW POWER'
-	}[val]
+	try:
+		return {
+			0:	'INITIAL',
+			1:	'ANTENNA DEPLOY',
+			2:	'HELLO WORLD',
+			3:	'IDLE NO FLASH',
+			4:	'IDLE FLASH',
+			5:	'LOW POWER'
+		}[val]
+	except KeyError:
+		return INVALID_STR
 
 def get_message_type(val):
-	return {
-		0:	'IDLE',
-		1:	'ATTITUDE',
-		2:	'FLASH BURST',
-		3:	'FLASH CMP',
-		4:	'LOW POWER'
-	}[val]
+	try:
+		return {
+			0:	'IDLE',
+			1:	'ATTITUDE',
+			2:	'FLASH BURST',
+			3:	'FLASH CMP',
+			4:	'LOW POWER'
+		}[val]
+	except KeyError:
+		return INVALID_STR
 
 def is_hex_str(ps):
 	""" Returns whether the packet is only hexedecimal data """
@@ -115,27 +129,25 @@ def is_hex_str(ps):
 
 def parse_preamble(ps):
 	preamble = {}
+	errs = []
 	preamble['callsign'] = ps[0:12].decode("hex")
 	preamble['timestamp'] = hex_to_int_le(ps[12:20])
 
 	msg_op_states = int(ps[20:22],16)
 	preamble['message_type'] = get_message_type(msg_op_states & 0x07) #get_bit(msg_op_states, 7)+get_bit(msg_op_states, 6)+get_bit(msg_op_states, 5)
+	if preamble['message_type'] == INVALID_STR:
+		errs.append(PARSE_ERROR.INVALID_MSG_TYPE)
 	preamble['satellite_state'] = get_sat_state((msg_op_states >> 3) & 0x07) #get_bit(msg_op_states, 4)+get_bit(msg_op_states, 3)+get_bit(msg_op_states, 2)
+	if preamble['satellite_state'] == INVALID_STR:
+		errs.append(PARSE_ERROR.INVALID_SAT_STATE)
 
 	preamble['FLASH_KILLED'] = get_bit(msg_op_states, 6)
 	preamble['MRAM_CPY'] = get_bit(msg_op_states, 7)
 
-	try:
-		preamble['bytes_of_data'] = int(ps[22:24], 16)
-	except ValueError:
-		preamble['bytes_of_data'] = -1
+	preamble['bytes_of_data'] = int(ps[22:24], 16)
+	preamble['num_errors'] = int(ps[24:26], 16)
 
-	try:
-		preamble['num_errors'] = int(ps[24:26], 16)
-	except ValueError:
-		preamble['num_errors'] = -1
-
-	return preamble
+	return preamble, errs
 
 def parse_current_info(ps):
 	current_info = {}
@@ -413,6 +425,7 @@ def getErrorStartByte(message_type):
 		return 179*2
 	elif (message_type == 'LOW POWER'):
 		return 179*2
+	return -1
 
 def getNumErrorsInPacket(message_type):
 	if (message_type == 'IDLE'):
@@ -425,6 +438,7 @@ def getNumErrorsInPacket(message_type):
 		return 14
 	elif (message_type == 'LOW POWER'):
 		return 14
+	return -1
 
 def convert_error_timestamp(timestamp_data, packet_timestamp):
 	# see https://github.com/BrownaSpaceEngineering/EQUiSatOS/blob/master/EQUiSatOS/EQUiSatOS/src/data_handling/package_transmission.c#L209
@@ -432,6 +446,8 @@ def convert_error_timestamp(timestamp_data, packet_timestamp):
 
 def parse_errors(ps, message_type, packet_timestamp):
 	errors = []
+	invalid_ecode = False
+	invalid_eloc = False
 	start = getErrorStartByte(message_type)
 	num_errors_in_packet = getNumErrorsInPacket(message_type)
 	for i in range(0, num_errors_in_packet):
@@ -441,12 +457,22 @@ def parse_errors(ps, message_type, packet_timestamp):
 		cur['error_location'] = int(ps[start+2:start+4],16)
 		cur['timestamp'] = convert_error_timestamp(int(ps[start+4:start+6],16), packet_timestamp)
 		cur['error_code_name'] = get_ECODE_name(cur['error_code'])
+		if cur['error_code_name'] == INVALID_STR:
+			invalid_ecode = True
 		cur['error_location_name'] = get_ELOC_name(cur['error_location'])
+		if cur['error_location_name'] == INVALID_STR:
+			invalid_eloc = True
 		# represent packet uniquely as its raw bytes, except use the fully qualified timestamp
 		cur['data_hash'] = ps[start:start+4] + int_to_hex(cur['timestamp'])
 		errors.append(cur)
 		start += 6
-	return errors
+
+	parse_errs = []
+	if invalid_eloc:
+		parse_errs.append(PARSE_ERROR.INVALID_ELOC)
+	if invalid_ecode:
+		parse_errs.append(PARSE_ERROR.INVALID_ECODE)
+	return errors, parse_errs
 
 def parse_data_section(message_type, ps):
 	if (message_type == 'IDLE'):
@@ -459,21 +485,30 @@ def parse_data_section(message_type, ps):
 		return parse_flash_cmp_data(ps)
 	elif (message_type == 'LOW POWER'):
 		return parse_low_power_data(ps)
+	return {}
 
 
 def parse_packet(ps):
 	# with or without parity bytes
 	if (len(ps) != 510 and len(ps) != 446):
-		return {}, PARSE_ERROR.WRONG_SIZE
+		return {}, [PARSE_ERROR.WRONG_SIZE]
 
 	packet = {}
-	packet['preamble'] = parse_preamble(ps)
+	parse_errs = []
+	packet['preamble'], preamble_err = parse_preamble(ps)
+	parse_errs = parse_errs + preamble_err
 	packet['current_info'] = parse_current_info(ps)
+
 	message_type = packet['preamble']['message_type']
-	packet['data'] = parse_data_section(message_type, ps)
-	num_errors = packet['preamble']['num_errors']
-	packet['errors'] = parse_errors(ps, message_type, packet['preamble']['timestamp'])
-	return packet, None
+	if message_type != INVALID_STR:
+		packet['data'] = parse_data_section(message_type, ps)
+		packet['errors'], error_err = parse_errors(ps, message_type, packet['preamble']['timestamp'])
+		parse_errs = parse_errs + error_err
+	else:
+		packet['data'] = {}
+		packet['errors'] = {}
+
+	return packet, parse_errs
 
 def find_packets(file):
 	with open(file, 'r') as f:
@@ -481,7 +516,8 @@ def find_packets(file):
 		packets = re.findall("(574c39585a45.{498})", dump_str)
 		return packets
 
-
+def gen_random_buf():
+	return binascii.hexlify(bytearray([random.randint(0, 255) for i in range(255)]))
 
 def main():
 	attitude = "574c39585a457d6e000021a5092702dfde585104042754e0f1aeb1b1b2e339ba39bf39af39a839173a5609823f80823f817f7f80777879777879e46a0000dd39bd39cb39af39b7390b3a5609823f81823f807f7f8077787977787970660000d439bb39c639a139ac39033a5609823f80823f807f7f80777879777879fc610000cf39b439bf399b39a639ff395609823f81823f807f7f80777879777879885d0000d539ac39ac399b39a939fb395609823f80823f807f7f8077787977787914590000a732529b2a569c2a5608150008155a9c295a9b305e9b305ea23e5e0000b8bf966e88d0864f8bc4b68a23f6a54b585f5f843d9dded0c2e252bdbe1ebd85"
@@ -498,6 +534,8 @@ def main():
 	if (len(sys.argv) < 2):
 		for pkt in packets:
 			print(json.dumps(parse_packet(pkt)[0]))
+		# for i in range(10000):
+		# 	print(parse_packet(gen_random_buf()))
 	else:
 		for x in sys.argv[1:]:
 			packets = find_packets(x)

@@ -1,5 +1,15 @@
 var constants = require("./constants.json");
 
+PARSE_ERROR = {
+	WRONG_SIZE: "wrong size packet",
+	INVALID_MSG_TYPE: "invalid message type",
+	INVALID_SAT_STATE: "invalid sat state",
+	INVALID_ECODE: "invalid error code(s)",
+	INVALID_ELOC: "invalid error location(s)"
+}
+
+INVALID_STR = "[invalid]"
+
 // constant helpers
 DATA_SECTION_START_BYTE = constants["DATA_SECTION_START_BYTE"]
 IDLE_BATCHES_PER_PACKET	= constants["IDLE_BATCHES_PER_PACKET"]
@@ -117,24 +127,36 @@ function led_sns_mV_to_mA(mV) {
 }
 
 function get_sat_state(val) {
-	return [
+	ret = [
 		'INITIAL',
 		'ANTENNA DEPLOY',
 		'HELLO WORLD',
 		'IDLE NO FLASH',
 		'IDLE FLASH',
 		'LOW POWER'
-	][val]
+	][val];
+
+	if (ret === undefined) {
+	    return INVALID_STR
+	} else {
+	    return ret;
+	}
 }
 
 function get_message_type(val) {
-	return [
+	ret = [
 		'IDLE',
 		'ATTITUDE',
 		'FLASH BURST',
 		'FLASH CMP',
 		'LOW POWER'
-	][val]
+	][val];
+
+	if (ret === undefined) {
+	    return INVALID_STR
+	} else {
+	    return ret;
+	}
 }
 
 var HEX_RE = /[0-9A-Fa-f]/g;
@@ -145,23 +167,27 @@ function is_hex_str(ps) {
 
 function parse_preamble(ps) {
 	preamble = {}
+	errs = []
 	preamble['callsign'] = String(Buffer.from(ps.slice(0,12), 'hex'));
 	preamble['timestamp'] = hex_to_int_le(ps.slice(12,20))
 
 	msg_op_states = parseInt(ps.slice(20,22), 16)
 	preamble['message_type'] = get_message_type(msg_op_states & 0x07) //get_bit(msg_op_states, 7)+get_bit(msg_op_states, 6)+get_bit(msg_op_states, 5)
+	if (preamble['message_type'] == PARSE_ERROR.INVALID_STR) {
+	    errs.push(PARSE_ERROR.INVALID_MSG_TYPE)
+	}
 	preamble['satellite_state'] = get_sat_state((msg_op_states >> 3) & 0x07) //get_bit(msg_op_states, 4)+get_bit(msg_op_states, 3)+get_bit(msg_op_states, 2)
+	if (preamble['satellite_state'] == PARSE_ERROR.INVALID_STR) {
+	    errs.push(PARSE_ERROR.INVALID_SAT_STATE)
+	}
 
 	preamble['FLASH_KILLED'] = get_bit(msg_op_states, 6)
 	preamble['MRAM_CPY'] = get_bit(msg_op_states, 7)
 
 	preamble['bytes_of_data'] = parseInt(ps.slice(22,24), 16)
-	if (preamble['bytes_of_data'] === NaN) { preamble['bytes_of_data'] = -1 }
-
 	preamble['num_errors'] = parseInt(ps.slice(24,26), 16)
-	if (preamble['num_errors'] === NaN) { preamble['num_errors'] = -1 }
 
-	return preamble
+	return [preamble, errs]
 }
 
 function parse_current_info(ps) {
@@ -461,6 +487,7 @@ function getErrorStartByte(message_type) {
 	} else if (message_type == 'LOW POWER') {
 		return 179*2
 	}
+	return -1
 }
 
 function getNumErrorsInPacket(message_type) {
@@ -475,6 +502,7 @@ function getNumErrorsInPacket(message_type) {
 	} else if (message_type == 'LOW POWER') {
 		return 14
 	}
+	return -1
 }
 
 function convert_error_timestamp(timestamp_data, packet_timestamp) {
@@ -484,6 +512,8 @@ function convert_error_timestamp(timestamp_data, packet_timestamp) {
 
 function parse_errors(ps, message_type, packet_timestamp) {
 	errors = []
+	invalid_ecode = false
+	invalid_eloc = false
 	start = getErrorStartByte(message_type)
 	num_errors_in_packet = getNumErrorsInPacket(message_type)
 	for (var i = 0; i < num_errors_in_packet; i++) {
@@ -493,13 +523,26 @@ function parse_errors(ps, message_type, packet_timestamp) {
 		cur['error_location'] = parseInt(ps.slice(start+2,start+4), 16)
 		cur['timestamp'] = convert_error_timestamp(parseInt(ps.slice(start+4,start+6), 16), packet_timestamp)
 		cur['error_code_name'] = get_ECODE_name(cur['error_code'])
+		if (cur['error_code_name'] == INVALID_STR) {
+		    invalid_ecode = true
+		}
 		cur['error_location_name'] = get_ELOC_name(cur['error_location'])
+		if (cur['error_location_name'] == INVALID_STR) {
+		    invalid_eloc = true
+		}
 		// represent packet uniquely as its raw bytes, except use the fully qualified timestamp
 		cur['data_hash'] = ps.slice(start,start+4) + int_to_hex(cur['timestamp'])
 		errors.push(cur)
 		start += 6
 	}
-	return errors
+	parse_errs = []
+    if (invalid_eloc) {
+        parse_errs.push(PARSE_ERROR.INVALID_ELOC)
+    }
+    if (invalid_ecode) {
+        parse_errs.push(PARSE_ERROR.INVALID_ECODE)
+    }
+	return [errors, parse_errs]
 }
 
 function parse_data_section(message_type, ps) {
@@ -520,17 +563,34 @@ function parse_data_section(message_type, ps) {
 function parse_packet(ps) {
 	// with or without parity bytes
 	if (ps.length != 510 && ps.length != 446) {
-		return null;
+		return [null, [PARSE_ERROR.WRONG_SIZE]];
 	}
 
 	packet = {}
-	packet['preamble'] = parse_preamble(ps)
+	parse_errs = []
+	preamble_res = parse_preamble(ps)
+	packet['preamble'] = preamble_res[0]
+	parse_errs = parse_errs + preamble_res[1]
 	packet['current_info'] = parse_current_info(ps)
 	message_type = packet['preamble']['message_type']
-	packet['data'] = parse_data_section(message_type, ps)
-	num_errors = packet['preamble']['num_errors']
-	packet['errors'] = parse_errors(ps, message_type, packet['preamble']['timestamp'])
-	return packet
+	if (message_type != INVALID_STR) {
+        packet['data'] = parse_data_section(message_type, ps)
+        errors_res = parse_errors(ps, message_type, packet['preamble']['timestamp'])
+        packet['errors'] = errors_res[0]
+        parse_errs = parse_errs + errors_res[1]
+	} else {
+		packet['data'] = {}
+		packet['errors'] = {}
+	}
+	return [packet, parse_errs]
+}
+
+function gen_random_buf() {
+    buf = ""
+    for (var i = 0; i < 2*255; i++) {
+        buf = buf + int_to_hex(Math.floor(Math.random()*16))
+    }
+    return buf
 }
 
 function main() {
@@ -548,7 +608,11 @@ function main() {
 	for (var i = 0; i < packets.length; i++) {
 		console.log(JSON.stringify(parse_packet(packets[i])));
 	}
+
+//	for (var i = 0; i < 10000; i++) {
+//        console.log(parse_packet(gen_random_buf()))
+//	}
 }
 
-//main();
+main();
 exports.parse_packet = parse_packet
