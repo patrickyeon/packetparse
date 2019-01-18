@@ -176,7 +176,7 @@ function parse_preamble(ps) {
 	if (preamble['message_type'] == PARSE_ERROR.INVALID_STR) {
 	    errs.push(PARSE_ERROR.INVALID_MSG_TYPE)
 	}
-	preamble['satellite_state'] = get_sat_state((msg_op_states >> 3) & 0x07) //get_bit(msg_op_states, 4)+get_bit(msg_op_states, 3)+get_bit(msg_op_states, 2)
+	preamble['satellite_state'] = get_sat_state((msg_op_states >> 3) & 0x07) //get_bit(msg_op_states, 4)+get_bit(msg_op_states, 3)+get_bit(msg_op_states, Circular2)
 	if (preamble['satellite_state'] == PARSE_ERROR.INVALID_STR) {
 	    errs.push(PARSE_ERROR.INVALID_SAT_STATE)
 	}
@@ -570,14 +570,14 @@ function parse_packet(ps) {
 	parse_errs = []
 	preamble_res = parse_preamble(ps)
 	packet['preamble'] = preamble_res[0]
-	parse_errs = parse_errs + preamble_res[1]
+	parse_errs = parse_errs.concat(preamble_res[1])
 	packet['current_info'] = parse_current_info(ps)
 	message_type = packet['preamble']['message_type']
 	if (message_type != INVALID_STR) {
         packet['data'] = parse_data_section(message_type, ps)
         errors_res = parse_errors(ps, message_type, packet['preamble']['timestamp'])
         packet['errors'] = errors_res[0]
-        parse_errs = parse_errs + errors_res[1]
+        parse_errs = parse_errs.concat(errors_res[1])
 	} else {
 		packet['data'] = {}
 		packet['errors'] = {}
@@ -605,9 +605,9 @@ function main() {
 	test = "574c39585a45671600002c9618ff04e1e25d5803032856f0e2c6b2a0b20ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600000ee3e35d5804042856f0e200000000c339b8390000b5397f7f80661600009c30009b2a009b2f009c2e009b2a009c30009b2f009c2e00573b00323d00323d06573b07b54a090e050000003f73fed7e2e664ec3eea86bc64849d141afd525558ca00a32d87879a23043592"
 	packets = [attitude, idle, fb1, fb2, fc1, fc2, lp1, lp2, test]
 
-	for (var i = 0; i < packets.length; i++) {
-		console.log(JSON.stringify(parse_packet(packets[i])));
-	}
+	// for (var i = 0; i < packets.length; i++) {
+	// 	console.log(JSON.stringify(parse_packet(packets[i])));
+	// }
 
 //	for (var i = 0; i < 10000; i++) {
 //        console.log(parse_packet(gen_random_buf()))
