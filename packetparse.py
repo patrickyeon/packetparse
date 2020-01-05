@@ -7,8 +7,12 @@ import re
 import sys
 import random
 import binascii
+import codecs
 
-from constants import constants
+if __name__ == "__main__" or sys.version_info[0] < 3:
+	from constants import constants
+else:
+	from .constants import constants
 
 class PARSE_ERROR:
 	WRONG_SIZE = "wrong size packet"
@@ -51,8 +55,10 @@ def get_ECODE_name(ecode):
 		return INVALID_STR
 
 def untruncate(val, sig):
-	u16 = (val) << 8;
-	return u16 / get_line_m_from_signal(sig) - get_line_b_from_signal(sig)
+	u16 = (val) << 8
+	# note: it is not desirable to cast to an int before the subtraction here (it's a bug),
+	# but we're doing so to keep python3 compatible with python2 and js
+	return int(int(u16 / get_line_m_from_signal(sig)) - get_line_b_from_signal(sig))
 
 def get_bit(byte, i):
 	return byte & (1<<i) > 0
@@ -130,7 +136,7 @@ def is_hex_str(ps):
 def parse_preamble(ps):
 	preamble = {}
 	errs = []
-	preamble['callsign'] = ps[0:12].decode("hex")
+	preamble['callsign'] = unhexlify(ps[0:12]).decode("ascii", errors="replace")
 	preamble['timestamp'] = hex_to_int_le(ps[12:20])
 
 	msg_op_states = int(ps[20:22],16)
@@ -159,8 +165,8 @@ def parse_current_info(ps):
 	current_info['L2_SNS'] = l_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[36:38]), "S_L_SNS"))
 	current_info['L1_TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[38:40]), "S_L_TEMP"))
 	current_info['L2_TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[40:42]), "S_L_TEMP"))
-	current_info['PANELREF'] = (untruncate(int(ps[42:44], 16), "S_PANELREF")-130)*5580/1000
-	current_info['L_REF'] = (untruncate(int(ps[44:46], 16), "S_LREF")-50)*2717/1000
+	current_info['PANELREF'] = int((untruncate(int(ps[42:44], 16), "S_PANELREF")-130)*5580/1000)
+	current_info['L_REF'] = int((untruncate(int(ps[44:46], 16), "S_LREF")-50)*2717/1000)
 
 	bat_digsigs_1 = int(ps[46:48],16)
 	bat_digsigs_2 = int(ps[48:50],16)
@@ -236,14 +242,14 @@ def parse_idle_data(ps):
 		cur['L2_SNS'] = l_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[start+8:start+10]), "S_L_SNS"))
 		cur['L1_TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[start+10:start+12]), "S_L_TEMP"))
 		cur['L2_TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[start+12:start+14]), "S_L_TEMP"))
-		cur['PANELREF'] = (untruncate(int(ps[start+14:start+16], 16), "S_PANELREF")-130)*5580/1000
-		cur['L_REF'] = (untruncate(int(ps[start+16:start+18], 16), "S_LREF")-50)*2717/1000
+		cur['PANELREF'] = int((untruncate(int(ps[start+14:start+16], 16), "S_PANELREF")-130)*5580/1000)
+		cur['L_REF'] = int((untruncate(int(ps[start+16:start+18], 16), "S_LREF")-50)*2717/1000)
 
 		bat_digsigs_1 = int(ps[start+18:start+20],16)
 		bat_digsigs_2 = int(ps[start+20:start+22],16)
 		parse_dig_sigs(bat_digsigs_1, bat_digsigs_2, cur)
 
-		cur['RAD_TEMP'] = untruncate(int(ps[start+22:start+24], 16), "S_RAD_TEMP")/10
+		cur['RAD_TEMP'] = int(untruncate(int(ps[start+22:start+24], 16), "S_RAD_TEMP")/10)
 		cur['IMU_TEMP'] = (untruncate(int(ps[start+24:start+26], 16), "S_IMU_TEMP")) / 333.87 + 21
 
 		cur['IR_FLASH_AMB'] = ir_raw_to_C(untruncate(int(ps[start+26:start+28], 16), "S_IR_AMB"))
@@ -358,8 +364,8 @@ def parse_low_power_data(ps):
 		cur['L2_SNS'] = l_sns_mV_to_mA(untruncate(hex_string_byte_to_signed_int(ps[start+8:start+10]), "S_L_SNS"))
 		cur['L1_TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[start+10:start+12]), "S_L_TEMP"))
 		cur['L2_TEMP'] = ad590_mV_to_C(untruncate(hex_string_byte_to_signed_int(ps[start+12:start+14]), "S_L_TEMP"))
-		cur['PANELREF'] = (untruncate(int(ps[start+14:start+16], 16), "S_PANELREF")-130)*5580/1000
-		cur['L_REF'] = (untruncate(int(ps[start+16:start+18], 16), "S_LREF")-50)*2717/1000
+		cur['PANELREF'] = int((untruncate(int(ps[start+14:start+16], 16), "S_PANELREF")-130)*5580/1000)
+		cur['L_REF'] = int((untruncate(int(ps[start+16:start+18], 16), "S_LREF")-50)*2717/1000)
 
 		bat_digsigs_1 = int(ps[start+18:start+20],16)
 		bat_digsigs_2 = int(ps[start+20:start+22],16)
@@ -492,6 +498,10 @@ def parse_packet(ps):
 	# with or without parity bytes
 	if (len(ps) != 510 and len(ps) != 446):
 		return {}, [PARSE_ERROR.WRONG_SIZE]
+
+	# ensure that it is a string
+	if type(ps) == bytes:
+		ps = ps.decode('ascii')
 
 	packet = {}
 	parse_errs = []
