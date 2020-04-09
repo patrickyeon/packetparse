@@ -506,17 +506,22 @@ def parse_packet(ps):
 	packet = {}
 	parse_errs = []
 	packet['preamble'], preamble_err = parse_preamble(ps)
-	parse_errs = parse_errs + preamble_err
+	parse_errs.append(preamble_err)
 	packet['current_info'] = parse_current_info(ps)
+	# add the timestamp, for consistency
+	packet['current_info']['timestamp'] = packet['preamble']['timestamp']
 
 	message_type = packet['preamble']['message_type']
 	if message_type != INVALID_STR:
 		packet['data'] = parse_data_section(message_type, ps)
 		packet['errors'], error_err = parse_errors(ps, message_type, packet['preamble']['timestamp'])
-		parse_errs = parse_errs + error_err
+		parse_errs.append(error_err)
 	else:
 		packet['data'] = {}
 		packet['errors'] = {}
+
+	# enforcing more consistency
+	packet['error_codes'] = packet['errors']
 
 	return packet, parse_errs
 
