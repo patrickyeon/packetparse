@@ -1,13 +1,14 @@
 #!/usr/bin/python
 
 from struct import unpack
-from binascii import unhexlify
+from binascii import hexlify, unhexlify
 import json
 import re
 import sys
 import random
 import binascii
 import codecs
+from reedsolo import RSCodec, ReedSolomonError
 
 if __name__ == "__main__" or sys.version_info[0] < 3:
     from constants import constants
@@ -20,6 +21,7 @@ class PARSE_ERROR:
     INVALID_SAT_STATE = "invalid sat state"
     INVALID_ECODE = "invalid error code(s)"
     INVALID_ELOC = "invalid error location(s)"
+    BAD_REED_SOLOMON = "errors could not be corrected by RS decoding"
 
 INVALID_STR = "[invalid]"
 
@@ -32,6 +34,8 @@ FLASHCMP_BATCHES_PER_PACKET   = constants["FLASHCMP_BATCHES_PER_PACKET"]
 LOWPOWER_BATCHES_PER_PACKET   = constants["LOWPOWER_BATCHES_PER_PACKET"]
 ERROR_TIME_BUCKET_SIZE        = constants["ERROR_TIME_BUCKET_SIZE"]
 Ms_and_Bs                     = constants["Ms_and_Bs"]
+
+rsCoder = RSCodec(32, fcr=1)
 
 def get_line_m_from_signal(sig):
     try:
@@ -505,6 +509,18 @@ def parse_packet(ps):
 
     packet = {}
     parse_errs = []
+
+    # correct errors if they exist and if we can
+    original_ps = ps
+    if len(ps) == 510:
+        orig_hex = unhexlify(ps)
+        try:
+            # the 6-character callsign not included in checksum
+            corrected = rsCoder.decode(orig_hex[6:])[0]
+            ps = original_ps[:12] + hexlify(corrected).decode('ascii')
+        except ReedSolomonError:
+            parse_errs.append(PARSE_ERROR.BAD_REED_SOLOMON)
+
     packet['preamble'], preamble_err = parse_preamble(ps)
     parse_errs.extend(preamble_err)
     packet['current_info'] = parse_current_info(ps)
@@ -522,6 +538,13 @@ def parse_packet(ps):
 
     # enforcing more consistency
     packet['error_codes'] = packet['errors']
+
+    packet['corrected'] = ps
+    # not a perfect thing, but this is the only place I see raw data stored
+    packet['station_info'] = [{'latitude': 0.0, 'longitude': 0.0,
+                               'name': 'Missing Station Info',
+                               'pass_data': None, 'raw': original_ps
+                              }]
 
     return packet, parse_errs
 
