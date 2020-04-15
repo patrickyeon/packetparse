@@ -69,7 +69,7 @@ def get_bit(byte, i):
 
 def hex_to_int_le(hexstr):
     try:
-        return unpack('<i', unhexlify(hexstr))[0]
+        return unpack('<I', unhexlify(hexstr))[0]
     except TypeError:
         return -1
 
@@ -228,7 +228,7 @@ def parse_attitude_data(ps):
         cur['timestamp'] = hex_to_int_le(ps[start+58:start+66])
         cur['data_hash'] = ps[start:start+66]
 
-        data.append(cur)
+        data.append({'data_type': 'ATTITUDE', 'payload': cur})
         start += 66
     return data
 
@@ -266,7 +266,7 @@ def parse_idle_data(ps):
         cur['timestamp'] = hex_to_int_le(ps[start+38:start+46])
         cur['data_hash'] = ps[start:start+46]
 
-        data.append(cur)
+        data.append({'data_type': 'IDLE', 'payload': cur})
         start += 46
     return data
 
@@ -315,7 +315,7 @@ def parse_flash_burst_data(ps):
         start += 6
     data['burst'] = burst
     data['timestamp'] = hex_to_int_le(ps[start:start+8])
-    return data
+    return [{'data_type': 'FLASH BURST', 'payload': data}]
 
 def parse_flash_cmp_data(ps):
     data = []
@@ -350,7 +350,7 @@ def parse_flash_cmp_data(ps):
 
         cur['timestamp'] = hex_to_int_le(ps[start+42:start+50])
         cur['data_hash'] = ps[start:start+50]
-        data.append(cur)
+        data.append({'data_type': 'FLASH CMP', 'payload': cur})
         start += 50
     return data
 
@@ -389,7 +389,7 @@ def parse_low_power_data(ps):
         cur['timestamp'] = hex_to_int_le(ps[start+52:start+60])
         cur['data_hash'] = ps[start:start+60]
 
-        data.append(cur)
+        data.append({'data_type': 'LOW POWER', 'payload': cur})
         start += 60
     return data
 
@@ -530,14 +530,11 @@ def parse_packet(ps):
     message_type = packet['preamble']['message_type']
     if message_type != INVALID_STR:
         packet['data'] = parse_data_section(message_type, ps)
-        packet['errors'], error_err = parse_errors(ps, message_type, packet['preamble']['timestamp'])
+        packet['error_codes'], error_err = parse_errors(ps, message_type, packet['preamble']['timestamp'])
         parse_errs.extend(error_err)
     else:
         packet['data'] = {}
-        packet['errors'] = {}
-
-    # enforcing more consistency
-    packet['error_codes'] = packet['errors']
+        packet['error_codes'] = {}
 
     packet['corrected'] = ps
     # not a perfect thing, but this is the only place I see raw data stored
